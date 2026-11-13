@@ -18,6 +18,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "database" / "university_records.db"
 SCHEMA_SQL_PATH = PROJECT_ROOT / "database" / "schema.sql"
 SEED_SQL_PATH = PROJECT_ROOT / "database" / "seed-data.sql"
+if not SCHEMA_SQL_PATH.exists():
+    # Deployment root may be source/ while SQL assets remain in sibling database/.
+    PROJECT_ROOT = Path(__file__).resolve().parent
+    DEFAULT_DB_PATH = PROJECT_ROOT / "database" / "university_records.db"
+    SCHEMA_SQL_PATH = PROJECT_ROOT / "database" / "schema.sql"
+    SEED_SQL_PATH = PROJECT_ROOT / "database" / "seed-data.sql"
 
 
 def get_db_connection(db_path=None):
