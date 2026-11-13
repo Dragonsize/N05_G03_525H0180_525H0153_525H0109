@@ -94,7 +94,7 @@ def page(body, **context):
     user = g.get("user")
     roles = roles_for(user["id"]) if user else []
     csrf = session.setdefault("csrf", secrets.token_urlsafe(24))
-    return render_template_string(PAGE, body=render_template_string(body, **context), user=user, roles=roles, csrf=csrf)
+    return render_template_string(PAGE, body=render_template_string(body, csrf=csrf, **context), user=user, roles=roles, csrf=csrf)
 
 
 def require_login(fn):
