@@ -190,13 +190,14 @@ def dashboard():
     students = safe_query_all(g.db, "SELECT sp.id,sp.student_code,u.full_name,sp.major,sp.phone,sp.address FROM student_profiles sp JOIN users u ON u.id=sp.user_id ORDER BY sp.id") if "Registrar" in role else []
     enrollments = safe_query_all(g.db, "SELECT e.id,sp.student_code,c.course_code,g.final_score FROM enrollments e JOIN student_profiles sp ON e.student_id=sp.id JOIN courses c ON e.course_id=c.id LEFT JOIN grades g ON g.enrollment_id=e.id ORDER BY e.id") if "Lecturer" in role else []
     users = safe_query_all(g.db, "SELECT u.id,u.username,u.full_name,u.is_active,group_concat(r.role_name, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id GROUP BY u.id ORDER BY u.id") if "System Administrator" in role else []
+    users = [dict(user, action_endpoint="enable_user" if not user["is_active"] else "disable_user", action_label="Enable" if not user["is_active"] else "Disable", action_disabled=(user["id"] == g.user["id"] and bool(user["is_active"])), action_disabled_reason="Cannot disable your own account" if user["id"] == g.user["id"] and user["is_active"] else "") for user in users]
     logs = read_audit_logs(g.db, g.user["id"], g.user["username"], role).get("logs", []) if "Security Auditor" in role else []
     return page('''
     {% if profile %}<section class="card"><h2>My profile</h2><p>{{ profile.student_code }} · {{ profile.major }}</p><form method="post" action="{{ url_for('profile_update',pid=profile.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input name="phone" value="{{ profile.phone or '' }}" placeholder="Phone"><input name="address" value="{{ profile.address or '' }}" placeholder="Address"><button>Save contact info</button></form><h3>My grades</h3>{{ table(grades) }}</section>{% endif %}
     {% if courses %}<section class="card"><h2>Assigned courses</h2>{{ table(courses) }}{% for c in courses %}<p><a href="{{ url_for('roster',cid=c.id) }}">Open roster: {{ c.course_code }}</a></p>{% endfor %}</section>{% endif %}
     {% if enrollments %}<section class="card"><h2>Grade entry</h2>{{ table(enrollments) }}{% for e in enrollments %}<form class="row" method="post" action="{{ url_for('grade_update',eid=e.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><span>{{ e.student_code }} · {{ e.course_code }}</span><input name="score" type="number" min="0" max="10" step="0.1" required placeholder="Final score"><button>Save grade</button></form>{% endfor %}</section>{% endif %}
     {% if students %}<section class="card"><h2>Student records</h2>{{ table(students) }}<h3>Create enrollment</h3><form method="post" action="{{ url_for('enroll') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><select name="student_id">{% for s in students %}<option value="{{ s.id }}">{{ s.student_code }} — {{ s.full_name }}</option>{% endfor %}</select><select name="course_id">{% for c in all_courses %}<option value="{{ c.id }}">{{ c.course_code }} — {{ c.course_name }}</option>{% endfor %}</select><button>Enroll</button></form></section>{% endif %}
-    {% if users %}<section class="card"><h2>User administration</h2>{{ table(users) }}{% for u in users %}<form method="post" action="{{ url_for('disable_user',uid=u.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button {% if not u.is_active %}disabled{% endif %}>Disable {{ u.username }}</button></form>{% endfor %}</section>{% endif %}
+    {% if users %}<section class="card"><h2>User administration</h2>{{ table(users) }}{% for u in users %}<form method="post" action="{{ url_for(u.action_endpoint,uid=u.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button {% if u.action_disabled %}disabled title="{{ u.action_disabled_reason }}"{% endif %}>{{ u.action_label }} {{ u.username }}</button></form>{% endfor %}</section>{% endif %}
     {% if logs %}<section class="card"><h2>Audit trail</h2>{{ table(logs) }}</section>{% endif %}
     {% if not profile and not courses and not students and not users and not logs %}<section class="card"><p>Signed in. No additional records available for your roles.</p></section>{% endif %}
     ''', profile=profile, grades=grades, courses=courses, enrollments=enrollments, students=students, all_courses=safe_query_all(g.db,"SELECT id,course_code,course_name FROM courses"), users=users, logs=logs, table=_table_html)
@@ -284,10 +285,38 @@ def enroll():
 @require_role("System Administrator")
 def disable_user(uid):
     csrf_check()
-    safe_execute(g.db,"UPDATE users SET is_active=0 WHERE id=?",(uid,))
-    safe_execute(g.db,"UPDATE user_sessions SET is_revoked=1 WHERE user_id=?",(uid,))
-    audit("USER_DISABLED",f"user:{uid}","SUCCESS","Account disabled and sessions revoked")
-    flash("User disabled; active sessions revoked")
+    target = safe_query_one(g.db, "SELECT id,is_active FROM users WHERE id=?", (uid,))
+    if not target:
+        abort(404)
+    if uid == g.user["id"]:
+        abort(400, "You cannot disable your own account")
+    if target["is_active"]:
+        result = safe_execute(g.db, "UPDATE users SET is_active=0,updated_at=CURRENT_TIMESTAMP WHERE id=?", (uid,))
+        if not result["ok"]:
+            abort(400, result.get("error", "Account update failed"))
+        safe_execute(g.db,"UPDATE user_sessions SET is_revoked=1 WHERE user_id=?",(uid,))
+        audit("USER_DISABLED",f"user:{uid}","SUCCESS","Account disabled and sessions revoked")
+        flash("User disabled; active sessions revoked")
+    else:
+        flash("User already disabled")
+    return redirect(url_for("dashboard"))
+
+
+@app.post("/admin/user/<int:uid>/enable")
+@require_role("System Administrator")
+def enable_user(uid):
+    csrf_check()
+    target = safe_query_one(g.db, "SELECT id,is_active FROM users WHERE id=?", (uid,))
+    if not target:
+        abort(404)
+    if not target["is_active"]:
+        result = safe_execute(g.db, "UPDATE users SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE id=?", (uid,))
+        if not result["ok"]:
+            abort(400, result.get("error", "Account update failed"))
+        audit("USER_ENABLED",f"user:{uid}","SUCCESS","Account re-enabled; revoked sessions remain revoked")
+        flash("User enabled; they must sign in again")
+    else:
+        flash("User already enabled")
     return redirect(url_for("dashboard"))
 
 

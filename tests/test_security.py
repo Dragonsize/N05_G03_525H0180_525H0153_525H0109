@@ -375,14 +375,31 @@ def disable_user_service(conn, acting_user_id: int, target_user_id: int) -> dict
     roles = get_user_roles(conn, acting_user_id)
     if "System Administrator" not in roles:
         return {"ok": False, "status": 403}
-
-    safe_execute(conn, "UPDATE users SET is_active = 0 WHERE id = ?;", (target_user_id,))
+    safe_execute(conn, "UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?;", (target_user_id,))
     safe_execute(conn, "UPDATE user_sessions SET is_revoked = 1 WHERE user_id = ?;", (target_user_id,))
     log_security_event(
         conn, acting_user_id, user["username"], "USER_DISABLED",
         f"user:{target_user_id}", "SUCCESS",
         f"System Administrator disabled user_id={target_user_id} and revoked active sessions"
     )
+    return {"ok": True, "status": 200}
+
+
+def enable_user_service(conn, acting_user_id: int, target_user_id: int) -> dict:
+    user = safe_query_one(conn, "SELECT username FROM users WHERE id = ?;", (acting_user_id,))
+    roles = get_user_roles(conn, acting_user_id)
+    target = safe_query_one(conn, "SELECT id,is_active FROM users WHERE id = ?;", (target_user_id,))
+    if "System Administrator" not in roles:
+        return {"ok": False, "status": 403}
+    if not target:
+        return {"ok": False, "status": 404}
+    if not target["is_active"]:
+        safe_execute(conn, "UPDATE users SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?;", (target_user_id,))
+        log_security_event(
+            conn, acting_user_id, user["username"], "USER_ENABLED",
+            f"user:{target_user_id}", "SUCCESS",
+            f"System Administrator re-enabled user_id={target_user_id}; revoked sessions remain revoked"
+        )
     return {"ok": True, "status": 200}
 
 
@@ -545,10 +562,16 @@ def run_all_30_tests():
     r27_other = update_student_profile_service(conn, acting_user_id=6, student_profile_id=2, phone="0000000000", address="District 4")
     record("T27", "Student profile update ownership check", r27_own["ok"] and (not r27_other["ok"]), "Own contact update allowed; other student rejected")
 
-    # T28: Administrator disables active user & immediate session/login revocation
+    # T28: Admin disables active user, then can re-enable without restoring revoked sessions
     r28_disable = disable_user_service(conn, acting_user_id=1, target_user_id=8)
-    r28_login = login_service(conn, "student_phat", "password")
-    record("T28", "Admin disables account & blocks login", r28_disable["ok"] and (not r28_login["ok"]), "User 8 disabled, sessions revoked & login blocked")
+    r28_login_disabled = login_service(conn, "student_phat", "password")
+    r28_enable = enable_user_service(conn, acting_user_id=1, target_user_id=8)
+    r28_login_enabled = login_service(conn, "student_phat", "password")
+    record(
+        "T28", "Admin disables and re-enables account",
+        r28_disable["ok"] and (not r28_login_disabled["ok"]) and r28_enable["ok"] and r28_login_enabled["ok"],
+        "Disabled login blocked; re-enabled login succeeds; prior sessions stay revoked"
+    )
 
     # T29: Default-deny policy for newly created user with zero roles
     safe_execute(
