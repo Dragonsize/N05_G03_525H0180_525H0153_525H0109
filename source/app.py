@@ -159,7 +159,7 @@ def login():
             session.permanent = True
             log_security_event(g.db, user["id"], user["username"], "LOGIN_SUCCESS", "auth/login", "SUCCESS", "User logged in", request.remote_addr or "127.0.0.1")
             return redirect(url_for("dashboard"))
-    return page('''<section class="card"><h2>Sign in</h2><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><p><input name="username" autocomplete="username" required placeholder="Username"></p><p><input type="password" name="password" autocomplete="current-password" required placeholder="Password"></p><button>Sign in</button></form><p class="muted">Demo users: student_an, lecturer_tu, registrar1, auditor1, admin1. Password: password</p></section>''')
+    return page('''<section class="card"><h2>Sign in</h2><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><p><input name="username" autocomplete="username" required placeholder="Username"></p><p><input type="password" name="password" autocomplete="current-password" required placeholder="Password"></p><button>Sign in</button></form><p class="muted">Demo users: student_an, student_phat, student_khoi, student_disabled, lecturer_auditor, lecturer_tu, lecturer_other, registrar1, auditor1, admin1. \n Password: password</p></section>''')
 
 
 @app.post("/logout")
