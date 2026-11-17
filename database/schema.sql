@@ -16,9 +16,9 @@ DROP TABLE IF EXISTS user_roles;
 DROP TABLE IF EXISTS roles;
 DROP TABLE IF EXISTS users;
 -- ============================================================================
--- 1. BẢNG USERS (Phục vụ mục 3.1 Authentication & Test T01, T02, T03, T05)
+-- 1. BẢNG USERS 
 -- - password_hash: Lưu chuỗi băm Bcrypt/Argon2/PBKDF2 (cấm lưu plaintext).
--- - is_active: 1 = Hoạt động, 0 = Bị vô hiệu hóa (chặn đăng nhập ở Test T03).
+-- - is_active: 1 = Hoạt động, 0 = Bị vô hiệu hóa.
 -- ============================================================================
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,7 +31,7 @@ CREATE TABLE users (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 -- ============================================================================
--- 2. BẢNG ROLES (Đúng 5 vai trò bắt buộc trong mục 2 System Scenario)
+-- 2. BẢNG ROLES 
 -- ============================================================================
 CREATE TABLE roles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +62,7 @@ CREATE TABLE user_roles (
     SET NULL
 );
 -- ============================================================================
--- 4. BẢNG USER_SESSIONS (Hỗ trợ quản lý phiên & Test T04: Hủy session khi Logout)
+-- 4. BẢNG USER_SESSIONS (Hỗ trợ quản lý phiên: Hủy session khi Logout)
 -- - Lưu mã băm của session/token (session_token_hash), KHÔNG lưu token rõ.
 -- - Khi user nhấn Logout, cập nhật is_revoked = 1 để chặn dùng lại session cũ.
 -- ============================================================================
@@ -76,7 +76,7 @@ CREATE TABLE user_sessions (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 -- ============================================================================
--- 5. BẢNG STUDENT_PROFILES (Hồ sơ sinh viên - Kiểm tra Ownership ở T06, T07)
+-- 5. BẢNG STUDENT_PROFILES (Hồ sơ sinh viên - Kiểm tra Ownership)
 -- - Liên kết 1-1 với bảng users qua cột user_id.
 -- - Student chỉ được sửa phone, address của chính mình; Registrar tạo/sửa hồ sơ.
 -- ============================================================================
@@ -96,7 +96,7 @@ CREATE TABLE student_profiles (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 -- ============================================================================
--- 6. BẢNG COURSES (Khóa học - Kiểm tra Assigned Course của Lecturer ở T09-T11)
+-- 6. BẢNG COURSES (Khóa học - Kiểm tra Assigned Course của Lecturer)
 -- - lecturer_id liên kết tới users(id) của giảng viên phụ trách môn đó.
 -- ============================================================================
 CREATE TABLE courses (
@@ -114,7 +114,7 @@ CREATE TABLE courses (
     SET NULL
 );
 -- ============================================================================
--- 7. BẢNG ENROLLMENTS (Đăng ký môn học - Phục vụ Registrar ở Test T12)
+-- 7. BẢNG ENROLLMENTS (Đăng ký môn học - Phục vụ Registrar)
 -- ============================================================================
 CREATE TABLE enrollments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,7 +132,7 @@ CREATE TABLE enrollments (
     SET NULL
 );
 -- ============================================================================
--- 8. BẢNG GRADES (Điểm số - Phục vụ Test T06, T08, T10, T11, T13, T17)
+-- 8. BẢNG GRADES (Điểm số)
 -- ============================================================================
 CREATE TABLE grades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

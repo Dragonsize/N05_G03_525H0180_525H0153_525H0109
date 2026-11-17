@@ -505,7 +505,7 @@ def run_all_30_tests():
     record("T20", "Rejected privileged actions appear in log", len(rejected_logs) >= 6, f"Verified {len(rejected_logs)} REJECTED entries in audit_logs")
 
     # ========================================================================
-    # 10 BÀI TEST MỞ RỘNG (T21 -> T30) ĐỂ ĐẠT ĐỦ 30 TEST CASES
+    # 10 TEST THÊM (T21 -> T30)
     # ========================================================================
 
     # T21: Attempt to UPDATE audit_logs -> Blocked by append-only trigger
