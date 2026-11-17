@@ -11,7 +11,7 @@ Flask application for managing university student records, enrollments, grades, 
 
 From the repository root, create and activate a virtual environment, then install dependencies:
 
-```powershell
+```cmd
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r source/requirements.txt
@@ -19,10 +19,11 @@ python -m pip install -r source/requirements.txt
 
 Set a local Flask secret and start the app:
 
-```powershell
-$env:SECRET_KEY = "replace-with-a-long-random-local-secret"
+```cmd
+set SECRET_KEY=my-local-secret-key-123456
 python source/app.py
 ```
+
 
 Open <http://127.0.0.1:5000>. The app initializes the SQLite database and inserts demo data when the configured database has no `users` table. By default, local data is stored in `database/university_records.db`. To use another database file, set `URS_DB_PATH` before starting the app.
 
