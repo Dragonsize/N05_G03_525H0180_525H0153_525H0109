@@ -32,7 +32,7 @@ app.config.update(
 
 # Small server-rendered UI keeps this assignment focused on backend access control.
 PAGE = r'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>University Records</title><style>
-*{box-sizing:border-box}body{font:16px system-ui,sans-serif;background:#f3f5f9;color:#172033;margin:0}.wrap{max-width:1050px;margin:36px auto;padding:0 18px}.card{background:white;border:1px solid #dce2ec;border-radius:12px;padding:22px;margin:16px 0;box-shadow:0 3px 14px #1720330a}h1,h2{margin-top:0}a{color:#2459bc}input,select,button{font:inherit;padding:9px 11px;border:1px solid #bac5d5;border-radius:7px;margin:4px 4px 4px 0}button{background:#1d4ed8;color:white;border:0;cursor:pointer}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;border-bottom:1px solid #e5e9f0}.msg{padding:10px;background:#e8f5e9;border-radius:6px}.nav{display:flex;gap:14px;flex-wrap:wrap}.muted{color:#667085;font-size:.9rem}.row{display:flex;gap:12px;flex-wrap:wrap}.row>*{flex:1;min-width:180px}code{overflow-wrap:anywhere}</style></head><body><main class="wrap"><header><h1>University Records System</h1>{% if user %}<div class="nav"><span>{{ user['full_name'] }} · {{ roles|join(', ') }}</span><a href="{{ url_for('dashboard') }}">Dashboard</a><form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Log out</button></form></div>{% endif %}</header>{% for message in get_flashed_messages() %}<p class="msg">{{ message }}</p>{% endfor %}{{ body|safe }}</main></body></html>'''
+*{box-sizing:border-box}body{font:16px system-ui,sans-serif;background:#f3f5f9;color:#172033;margin:0}.wrap{max-width:1050px;margin:36px auto;padding:0 18px}.card{background:white;border:1px solid #dce2ec;border-radius:12px;padding:22px;margin:16px 0;box-shadow:0 3px 14px #1720330a}h1,h2{margin-top:0}a{color:#2459bc}input,select,button{font:inherit;padding:9px 11px;border:1px solid #bac5d5;border-radius:7px;margin:4px 4px 4px 0}button{background:#1d4ed8;color:white;border:0;cursor:pointer}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;border-bottom:1px solid #e5e9f0}.msg{padding:10px;background:#e8f5e9;border-radius:6px}.nav{display:flex;gap:14px;flex-wrap:wrap}.muted{color:#667085;font-size:.9rem}.row{display:flex;gap:12px;flex-wrap:wrap}.row>*{flex:1;min-width:180px}code{overflow-wrap:anywhere}</style></head><body><main class="wrap"><header><h1>University Records System</h1>{% if user %}<div class="nav"><span>{{ user['full_name'] }} · {{ roles|join(', ') }}</span><a href="{{ url_for('dashboard') }}">Dashboard</a><form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Log out</button></form></div>{% endif %}</header>{% for message in get_flashed_messages() %}<p class="msg">{{ message }}</p>{% endfor %}{{ body|safe }}</main><script>document.addEventListener('click',function(event){const button=event.target.closest('.password-toggle');if(!button)return;const input=document.getElementById(button.dataset.target);if(!input)return;const reveal=input.type==='password';input.type=reveal?'text':'password';button.textContent=reveal?'Hide':'Show';button.setAttribute('aria-label',(reveal?'Hide':'Show')+' password');});</script></body></html>'''
 
 
 def _table_exists(conn, name):
@@ -190,17 +190,18 @@ def dashboard():
     students = safe_query_all(g.db, "SELECT sp.id,sp.student_code,u.full_name,sp.major,sp.phone,sp.address FROM student_profiles sp JOIN users u ON u.id=sp.user_id ORDER BY sp.id") if "Registrar" in role else []
     enrollments = safe_query_all(g.db, "SELECT e.id,sp.student_code,c.course_code,g.final_score FROM enrollments e JOIN student_profiles sp ON e.student_id=sp.id JOIN courses c ON e.course_id=c.id LEFT JOIN grades g ON g.enrollment_id=e.id ORDER BY e.id") if "Lecturer" in role else []
     users = safe_query_all(g.db, "SELECT u.id,u.username,u.full_name,u.is_active,group_concat(r.role_name, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id GROUP BY u.id ORDER BY u.id") if "System Administrator" in role else []
-    users = [dict(user, action_endpoint="enable_user" if not user["is_active"] else "disable_user", action_label="Enable" if not user["is_active"] else "Disable", action_disabled=(user["id"] == g.user["id"] and bool(user["is_active"])), action_disabled_reason="Cannot disable your own account" if user["id"] == g.user["id"] and user["is_active"] else "") for user in users]
+    user_actions = {user["id"]: user["id"] == g.user["id"] and bool(user["is_active"]) for user in users}
     logs = read_audit_logs(g.db, g.user["id"], g.user["username"], role).get("logs", []) if "Security Auditor" in role else []
     return page('''
+    <section class="card"><h2>Change password</h2><form method="post" action="{{ url_for('change_password') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><p><label>Current password <input id="current-password" type="password" name="current_password" required autocomplete="current-password"><button type="button" class="password-toggle" data-target="current-password" aria-label="Show current password">Show</button></label></p><p><label>New password <input id="new-password" type="password" name="new_password" required minlength="12" autocomplete="new-password"><button type="button" class="password-toggle" data-target="new-password" aria-label="Show new password">Show</button></label></p><p><label>Confirm new password <input id="confirm-password" type="password" name="confirm_password" required minlength="12" autocomplete="new-password"><button type="button" class="password-toggle" data-target="confirm-password" aria-label="Show confirmation password">Show</button></label></p><button>Update password</button></form><p class="muted">Use at least 12 characters. Passwords are stored as bcrypt hashes and cannot be viewed later.</p></section>
     {% if profile %}<section class="card"><h2>My profile</h2><p>{{ profile.student_code }} · {{ profile.major }}</p><form method="post" action="{{ url_for('profile_update',pid=profile.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input name="phone" value="{{ profile.phone or '' }}" placeholder="Phone"><input name="address" value="{{ profile.address or '' }}" placeholder="Address"><button>Save contact info</button></form><h3>My grades</h3>{{ table(grades) }}</section>{% endif %}
     {% if courses %}<section class="card"><h2>Assigned courses</h2>{{ table(courses) }}{% for c in courses %}<p><a href="{{ url_for('roster',cid=c.id) }}">Open roster: {{ c.course_code }}</a></p>{% endfor %}</section>{% endif %}
     {% if enrollments %}<section class="card"><h2>Grade entry</h2>{{ table(enrollments) }}{% for e in enrollments %}<form class="row" method="post" action="{{ url_for('grade_update',eid=e.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><span>{{ e.student_code }} · {{ e.course_code }}</span><input name="score" type="number" min="0" max="10" step="0.1" required placeholder="Final score"><button>Save grade</button></form>{% endfor %}</section>{% endif %}
     {% if students %}<section class="card"><h2>Student records</h2>{{ table(students) }}<h3>Create enrollment</h3><form method="post" action="{{ url_for('enroll') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><select name="student_id">{% for s in students %}<option value="{{ s.id }}">{{ s.student_code }} — {{ s.full_name }}</option>{% endfor %}</select><select name="course_id">{% for c in all_courses %}<option value="{{ c.id }}">{{ c.course_code }} — {{ c.course_name }}</option>{% endfor %}</select><button>Enroll</button></form></section>{% endif %}
-    {% if users %}<section class="card"><h2>User administration</h2>{{ table(users) }}{% for u in users %}<form method="post" action="{{ url_for(u.action_endpoint,uid=u.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button {% if u.action_disabled %}disabled title="{{ u.action_disabled_reason }}"{% endif %}>{{ u.action_label }} {{ u.username }}</button></form>{% endfor %}</section>{% endif %}
+    {% if users %}<section class="card"><h2>User administration</h2>{{ table(users) }}{% for u in users %}<form method="post" action="{{ url_for('enable_user' if not u.is_active else 'disable_user',uid=u.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button {% if user_actions[u.id] %}disabled title="Cannot disable your own account"{% endif %}>{{ 'Enable' if not u.is_active else 'Disable' }} {{ u.username }}</button></form>{% endfor %}</section>{% endif %}
     {% if logs %}<section class="card"><h2>Audit trail</h2>{{ table(logs) }}</section>{% endif %}
     {% if not profile and not courses and not students and not users and not logs %}<section class="card"><p>Signed in. No additional records available for your roles.</p></section>{% endif %}
-    ''', profile=profile, grades=grades, courses=courses, enrollments=enrollments, students=students, all_courses=safe_query_all(g.db,"SELECT id,course_code,course_name FROM courses"), users=users, logs=logs, table=_table_html)
+    ''', profile=profile, grades=grades, courses=courses, enrollments=enrollments, students=students, all_courses=safe_query_all(g.db,"SELECT id,course_code,course_name FROM courses"), users=users, user_actions=user_actions, logs=logs, table=_table_html)
 
 
 def _table_html(rows):
@@ -228,6 +229,39 @@ def profile_update(pid):
     safe_execute(g.db, "UPDATE student_profiles SET phone=?,address=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (phone,address,pid))
     audit("PROFILE_UPDATED", f"student_profile:{pid}", "SUCCESS", "Contact information updated")
     flash("Profile updated")
+    return redirect(url_for("dashboard"))
+
+
+@app.post("/account/password")
+@require_login
+def change_password():
+    csrf_check()
+    current_password = request.form.get("current_password", "")
+    new_password = request.form.get("new_password", "")
+    confirm_password = request.form.get("confirm_password", "")
+    user = safe_query_one(g.db, "SELECT password_hash FROM users WHERE id=? AND is_active=1", (g.user["id"],))
+    if not user or not bcrypt.checkpw(current_password.encode(), user["password_hash"].encode()):
+        flash("Current password is incorrect")
+        return redirect(url_for("dashboard"))
+    if len(new_password) < 12:
+        flash("New password must be at least 12 characters")
+        return redirect(url_for("dashboard"))
+    if len(new_password.encode("utf-8")) > 72:
+        flash("New password must not exceed 72 UTF-8 bytes")
+        return redirect(url_for("dashboard"))
+    if new_password != confirm_password:
+        flash("New password confirmation does not match")
+        return redirect(url_for("dashboard"))
+    if hmac.compare_digest(current_password, new_password):
+        flash("New password must differ from current password")
+        return redirect(url_for("dashboard"))
+    password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+    result = safe_execute(g.db, "UPDATE users SET password_hash=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (password_hash, g.user["id"]))
+    if not result["ok"]:
+        abort(400, result.get("error", "Password update failed"))
+    safe_execute(g.db, "UPDATE user_sessions SET is_revoked=1 WHERE user_id=? AND id<>?", (g.user["id"], g.user["session_id"]))
+    audit("PASSWORD_CHANGED", f"user:{g.user['id']}", "SUCCESS", "Password changed; other sessions revoked")
+    flash("Password updated; other sessions signed out")
     return redirect(url_for("dashboard"))
 
 

@@ -11,4 +11,8 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: URS_DB_PATH
-        value: /tmp/university_records.db
+        value: /var/data/university_records.db
+    disk:
+      name: university-records-data
+      mountPath: /var/data
+      sizeGB: 1
