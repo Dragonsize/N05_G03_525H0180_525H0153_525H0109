@@ -2,6 +2,8 @@
 
 Flask application for managing university student records, enrollments, grades, user accounts, and security audit events. The project demonstrates role-based and record-level access control.
 
+**Live Demo (Render):** <https://bigassignmentinfosecyes.onrender.com/login>
+
 ## Requirements
 
 - Python 3.12 or newer
